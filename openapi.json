@@ -1,0 +1,165 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Claude Agent Service",
+    "description": "Centralized AI agent service using Anthropic Claude. Multiple agents (dashboard-chat, blog-creator, blog-reviewer) via SSE streaming.",
+    "version": "0.1.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3002"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "serviceKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-api-key",
+        "description": "Service-to-service API key"
+      }
+    },
+    "schemas": {
+      "AgentName": {
+        "type": "string",
+        "description": "Agent name (dashboard-chat, blog-creator, blog-reviewer)"
+      },
+      "AgentRequest": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sessionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "appId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "runId": {
+            "type": "string"
+          },
+          "keySource": {
+            "type": "string",
+            "enum": [
+              "app",
+              "byok"
+            ]
+          },
+          "orgId": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "context": {
+            "type": "object",
+            "additionalProperties": {
+              "nullable": true
+            }
+          }
+        },
+        "required": [
+          "message",
+          "appId",
+          "runId",
+          "keySource"
+        ]
+      },
+      "HealthResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "service": {
+            "type": "string"
+          },
+          "database": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "service",
+          "database"
+        ]
+      }
+    },
+    "parameters": {}
+  },
+  "paths": {
+    "/agents/{agentName}": {
+      "post": {
+        "summary": "Run an agent with SSE streaming",
+        "description": "Sends a message to a named agent and streams the response as Server-Sent Events. Supports session resumption via sessionId.",
+        "security": [
+          {
+            "serviceKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/AgentName"
+            },
+            "required": true,
+            "description": "Agent name (dashboard-chat, blog-creator, blog-reviewer)",
+            "name": "agentName",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "SSE stream: {sessionId}, {type:token,content}, {type:tool_call,name,args}, {type:tool_result,name,result}, {type:buttons,buttons}, [DONE]",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request body"
+          },
+          "401": {
+            "description": "Missing or invalid x-api-key"
+          },
+          "404": {
+            "description": "Unknown agent name"
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Health check",
+        "responses": {
+          "200": {
+            "description": "Service health status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
